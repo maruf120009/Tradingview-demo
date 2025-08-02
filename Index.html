@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TradingView-like Web App Demo</title>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 0;
+    background: #f5f5f5;
+  }
+  #container {
+    display: flex;
+    height: 90vh;
+  }
+  #left-panel {
+    width: 70%;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+  }
+  #controls {
+    padding: 10px;
+    background: #eee;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  #chart {
+    flex-grow: 1;
+  }
+  #chat-panel {
+    width: 30%;
+    background: #222;
+    color: white;
+    display: flex;
+    flex-direction: column;
+  }
+  #chat-messages {
+    flex-grow: 1;
+    padding: 10px;
+    overflow-y: auto;
+    font-size: 14px;
+  }
+  #chat-input-area {
+    display: flex;
+    padding: 10px;
+    background: #333;
+  }
+  #chat-input {
+    flex-grow: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 4px;
+  }
+  #send-btn {
+    margin-left: 10px;
+    padding: 8px 12px;
+    border: none;
+    background: #4CAF50;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  #send-btn:hover {
+    background: #45a049;
+  }
+</style>
+</head>
+<body>
+
+<div id="container">
+  <div id="left-panel">
+    <div id="controls">
+      <label for="timeframe">Timeframe:</label>
+      <select id="timeframe">
+        <option value="1m">1m</option>
+        <option value="5m" selected>5m</option>
+        <option value="15m">15m</option>
+        <option value="1h">1h</option>
+        <option value="1d">1d</option>
+      </select>
+
+      <button id="playBtn">Play</button>
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+    <div id="chart"></div>
+  </div>
+
+  <div id="chat-panel">
+    <div id="chat-messages"></div>
+    <div id="chat-input-area">
+      <input id="chat-input" type="text" placeholder="Type message..." />
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // --- Chart Setup ---
+  const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+    width: document.getElementById('left-panel').clientWidth,
+    height: document.getElementById('left-panel').clientHeight - 50,
+    layout: { backgroundColor: '#ffffff', textColor: '#000' },
+    grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    priceScale: { borderColor: '#ccc' },
+    timeScale: { borderColor: '#ccc', timeVisible: true, secondsVisible: false },
+  });
+
+  const candleSeries = chart.addCandlestickSeries();
+
+  // --- Sample Data for Different Timeframes (demo) ---
+  const sampleData = {
+    "1m": [
+      { time: '2025-07-29T09:30:00', open: 100, high: 102, low: 99, close: 101 },
+      { time: '2025-07-29T09:31:00', open: 101, high: 103, low: 100, close: 102 },
+      { time: '2025-07-29T09:32:00', open: 102, high: 104, low: 101, close: 103 },
+      { time: '2025-07-29T09:33:00', open: 103, high: 105, low: 102, close: 104 },
+      { time: '2025-07-29T09:34:00', open: 104, high: 106, low: 103, close: 105 },
+    ],
+    "5m": [
+      { time: '2025-07-29T09:30:00', open: 100, high: 110, low: 95, close: 105 },
+      { time: '2025-07-29T09:35:00', open: 105, high: 115, low: 100, close: 110 },
+      { time: '2025-07-29T09:40:00', open: 110, high: 120, low: 105, close: 115 },
+      { time: '2025-07-29T09:45:00', open: 115, high: 125, low: 110, close: 120 },
+      { time: '2025-07-29T09:50:00', open: 120, high: 130, low: 115, close: 125 },
+    ],
+    "15m": [
+      { time: '2025-07-29T09:30:00', open: 100, high: 112, low: 95, close: 108 },
+      { time: '2025-07-29T09:45:00', open: 108, high: 120, low: 105, close: 115 },
+      { time: '2025-07-29T10:00:00', open: 115, high: 125, low: 110, close: 120 },
+      { time: '2025-07-29T10:15:00', open: 120, high: 130, low: 115, close: 125 },
+    ],
+    "1h": [
+      { time: '2025-07-29T09:00:00', open: 100, high: 120, low: 95, close: 115 },
+      { time: '2025-07-29T10:00:00', open: 115, high: 130, low: 110, close: 125 },
+      { time: '2025-07-29T11:00:00', open: 125, high: 135, low: 120, close: 130 },
+    ],
+    "1d": [
+      { time: '2025-07-29', open: 100, high: 130, low: 95, close: 125 },
+      { time: '2025-07-30', open: 125, high: 140, low: 120, close: 135 },
+      { time: '2025-07-31', open: 135, high: 150, low: 130, close: 145 },
+    ],
+  };
+
+  // --- Bar Replay Variables ---
+  let currentIndex = 0;
+  let replayTimer = null;
+
+  // --- Load data according to timeframe ---
+  let currentTF = document.getElementById('timeframe').value;
+
+  function loadReplayData() {
+    currentIndex = 0;
+    candleSeries.setData([]);
+  }
+
+  function updateChart() {
+    const tfData = sampleData[currentTF];
+    if (!tfData) return;
+    const slice = tfData.slice(0, currentIndex + 1);
+    candleSeries.setData(slice);
+  }
+
+  function playReplay() {
+    if (replayTimer) return;
+    const tfData = sampleData[currentTF];
+    if (!tfData) return;
+
+    replayTimer = setInterval(() => {
+      if (currentIndex >= tfData.length) {
+        clearInterval(replayTimer);
+        replayTimer = null;
+        return;
+      }
+      updateChart();
+      currentIndex++;
+    }, 800);
+  }
+
+  function pauseReplay() {
+    if (replayTimer) {
+      clearInterval(replayTimer);
+      replayTimer = null;
+    }
+  }
+
+  function resetReplay() {
+    pauseReplay();
+    currentIndex = 0;
+    candleSeries.setData([]);
+  }
+
+  // --- Event Listeners ---
+  document.getElementById('timeframe').addEventListener('change', (e) => {
+    currentTF = e.target.value;
+    resetReplay();
+  });
+  document.getElementById('playBtn').addEventListener('click', playReplay);
+  document.getElementById('pauseBtn').addEventListener('click', pauseReplay);
+  document.getElementById('resetBtn').addEventListener('click', resetReplay);
+
+  // --- Initial ---
+  resetReplay();
+
+  // --- Simple Chat System (LocalStorage) ---
+  const chatMessagesEl = document.getElementById('chat-messages');
+  const chatInputEl = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('send-btn');
+
+  // Load chat messages from localStorage
+  let chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+
+  function renderChat() {
+    chatMessagesEl.innerHTML = '';
+    chatMessages.forEach(msg => {
+      const msgDiv = document.createElement('div');
+      msgDiv.textContent = msg;
+      msgDiv.style.padding = '4px 8px';
+      msgDiv.style.borderBottom = '1px solid #444';
+      chatMessagesEl.appendChild(msgDiv);
+    });
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  }
+
+  sendBtn.addEventListener('click', () => {
+    const text = chatInputEl.value.trim();
+    if (!text) return;
+    chatMessages.push(text);
+    localStorage.setItem('chatMessages', JSON.stringify(chatMessages));
+    chatInputEl.value = '';
+    renderChat();
+  });
+
+  chatInputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      sendBtn.click();
+    }
+  });
+
+  renderChat();
+
+  // Resize chart when window resizes
+  window.addEventListener('resize', () => {
+    chart.applyOptions({ width: document.getElementById('left-panel').clientWidth, height: document.getElementById('left-panel').clientHeight - 50 });
+  });
+</script>
+
+</body>
+</html>
